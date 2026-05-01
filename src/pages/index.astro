@@ -16,13 +16,20 @@ const allProse = scenes.map((s) => s.prose).join("\n");
 const wordsOnly = allProse.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
 const wordCount = wordsOnly.split(/\s+/).filter(Boolean).length;
 const readMinutes = Math.max(1, Math.round(wordCount / 220));
+
+// `import.meta.env.BASE_URL` returns `/blog` (no trailing slash) when
+// `base: '/blog'` is set in astro.config. Normalize once so interpolation
+// stays a clean `${base}/foo.png`.
+const baseRaw = import.meta.env.BASE_URL;
+const base = baseRaw.replace(/\/$/, "");
+const ogImage = new URL(`${base}/og.png`, Astro.site).href;
 ---
 
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+		<link rel="icon" href={`${base}/favicon.ico`} />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
@@ -31,12 +38,12 @@ const readMinutes = Math.max(1, Math.round(wordCount / 220));
 		<meta property="og:type" content="article" />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
-		<meta property="og:image" content="/og.png" />
+		<meta property="og:image" content={ogImage} />
 
 		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:title" content={title} />
 		<meta name="twitter:description" content={description} />
-		<meta name="twitter:image" content="/og.png" />
+		<meta name="twitter:image" content={ogImage} />
 	</head>
 	<body>
 		<main>
