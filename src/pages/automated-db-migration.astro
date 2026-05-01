@@ -3,12 +3,12 @@ import { getEntry } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { Scrollytelling } from "../components/Scrollytelling";
 import { OutroComparison } from "../components/OutroComparison";
-import { scenes } from "../content/posts/just-run-a-migration/scenes";
+import { scenes } from "../content/posts/automated-db-migration/scenes";
 
 // Pulls title/description/etc from the content-collection stub so the
 // homepage card, RSS feed, and this page's <head> stay in sync.
-const entry = await getEntry("blog", "just-run-a-migration");
-if (!entry) throw new Error("blog/just-run-a-migration entry missing");
+const entry = await getEntry("blog", "automated-db-migration");
+if (!entry) throw new Error("blog/automated-db-migration entry missing");
 
 // Reading-time estimate. Strip code fences (which inflate word count
 // disproportionately to actual reading), then count whitespace-delimited

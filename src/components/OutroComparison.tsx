@@ -1,5 +1,5 @@
 import { ArchitectureDiagram } from "./ArchitectureDiagram";
-import { scenes } from "../content/posts/just-run-a-migration/scenes";
+import { scenes } from "../content/posts/automated-db-migration/scenes";
 import type { SceneDiff } from "../lib/diff";
 
 const EMPTY_DIFF: SceneDiff = {

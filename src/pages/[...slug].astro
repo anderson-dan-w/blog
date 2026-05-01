@@ -4,7 +4,7 @@ import PostLayout from "../layouts/PostLayout.astro";
 
 // Generate one route per plain-markdown post. Posts with a `customLayout`
 // frontmatter field have a hand-written `.astro` page sibling (e.g.
-// `pages/just-run-a-migration.astro`); skip them here.
+// `pages/automated-db-migration.astro`); skip them here.
 export async function getStaticPaths() {
   const posts = await getCollection("blog", (entry) =>
     entry.data.draft !== true && entry.data.customLayout === undefined,

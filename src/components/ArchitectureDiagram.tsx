@@ -1,4 +1,4 @@
-import type { Scene } from "../content/posts/just-run-a-migration/scenes";
+import type { Scene } from "../content/posts/automated-db-migration/scenes";
 import type { ElementState, SceneDiff } from "../lib/diff";
 import { connKey } from "../lib/diff";
 import { VIEWBOX, type GroupId, type NodeId } from "../lib/layout";
