@@ -1,0 +1,649 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1e1e1e;
+  --bg: #f5f5f7;
+  --accent: #6464f1;
+  --muted: #5e5e5e;
+  --rule: rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #ececec;
+    --bg: #1e1e1e;
+    --accent: #9a9aff;
+    --muted: #999;
+    --rule: rgba(255, 255, 255, 0.1);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  line-height: 1.65;
+  font-size: 18px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  line-height: 1.2;
+}
+
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: calc(36px + 1.5rem) 1.5rem 6rem;
+}
+
+.intro,
+.outro {
+  max-width: 640px;
+  margin: 3rem auto;
+}
+
+.intro h1 {
+  font-size: 2.75rem;
+  margin: 0 0 0.5rem;
+  line-height: 1.15;
+}
+
+.intro h1 code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+  font-size: 0.85em;
+  background: rgba(127, 127, 127, 0.12);
+  padding: 0.05em 0.3em;
+  border-radius: 5px;
+}
+
+.intro .subtitle {
+  margin: 0 0 1.5rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.intro em {
+  color: var(--muted);
+}
+
+/* ---- Scrollytelling ---- */
+
+.scrolly-progressbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 36px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+  z-index: 10;
+}
+
+.scrolly-progress-fill {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.05s linear;
+}
+
+.scrolly-progress-dots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  inset: 0 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.scrolly-progress-dots li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding-top: 6px;
+  transition: color 0.2s ease;
+}
+
+.scrolly-progress-dots li[data-active="true"] {
+  color: var(--accent);
+}
+
+.scrolly-progress-dots .label {
+  white-space: nowrap;
+}
+
+.scrolly-progress-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  border: 1.5px solid var(--bg);
+  margin-bottom: -5px;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.scrolly-progress-dots li[data-active="true"] .dot {
+  transform: scale(1.25);
+}
+
+.scrolly-container {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  margin: 4rem 0;
+}
+
+/* Sticky left column. True 50/50 quadrants — diagram top, extras bottom.
+   Reserved whether or not the current scene has extras, so layout doesn't
+   jump between scenes. `top: 36px` clears the fixed progress bar above. */
+.scrolly-diagram {
+  position: sticky;
+  top: 36px;
+  height: calc(100vh - 36px);
+  display: grid;
+  /* Diagram gets more space than extras — most scenes have light extras
+     (short snippets) and the diagram needs room for later scenes where
+     the cloud/terraform boundary extends below the k8s cluster. */
+  grid-template-rows: 3fr 2fr;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.diagram-zone,
+.extras-zone {
+  min-height: 0; /* let grid children actually shrink */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.extras-zone {
+  align-items: flex-start; /* hug the top of the quadrant, don't float to middle */
+  overflow: auto;
+}
+
+/* Inline copy of extras used on narrow viewports — rendered inside each
+   scrolly-step so the reader sees extras exactly when they're on that
+   scene, instead of inside a cramped sticky bar. Hidden on desktop; shown
+   via the mobile media query below. */
+.extras-inline {
+  display: none;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.9em;
+}
+
+.scrolly-diagram-inner {
+  width: 100%;
+  max-width: 640px;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.extras-inner {
+  width: 100%;
+  max-width: 640px;
+  font-size: 0.88em;
+}
+
+.diagram-svg {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  color: var(--fg);
+  /* Ghost-mode fade for the intro scene — same canvas stays mounted, just
+     dimmed while prose sets the stage. Transitions smoothly to full opacity
+     when the reader hits step-0 and real scenes begin. */
+  transition: opacity 0.4s ease;
+}
+
+.diagram-svg[data-ghosted="true"] {
+  opacity: 0.4;
+}
+
+/* Data-attribute-driven visibility for scene transitions. B.3 flips the
+   `data-visible` attribute per scene; the transition is handled here. */
+.diagram-node,
+.diagram-group {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.diagram-node[data-visible="false"],
+.diagram-group[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+/* Per-element diff state — set by `ArchitectureDiagram.diffWrap()` based on
+   how this scene differs from the previous. Multiplies with the
+   data-visible opacity above (nested SVG <g> opacity composes), so hidden
+   stuff stays hidden and visible stuff gets the right emphasis.
+
+   - `unchanged` carries over from the previous scene → dimmed.
+   - `label-changed` got a new label/subtitle → label text picks up accent.
+   - `new` is brand-new this scene → full opacity, accent stroke briefly.
+   - `none` (intro / no diff) → render normally.
+*/
+.diagram-element {
+  transition: opacity 0.4s ease;
+}
+
+.diagram-element[data-diff-state="unchanged"] {
+  opacity: 0.5;
+}
+
+.diagram-element[data-diff-state="new"] .diagram-node path,
+.diagram-element[data-diff-state="new"] .diagram-group path,
+.diagram-element[data-diff-state="new"] .diagram-connection path {
+  stroke: var(--accent);
+}
+
+.diagram-element[data-diff-state="label-changed"] text,
+.diagram-element[data-diff-state="new"] text {
+  fill: var(--accent);
+}
+
+/* Subtle one-shot glow on whatever's new this scene. The animation runs each
+   time the rule starts matching (i.e. each time an element transitions into
+   `new` state on scroll), so scrolling back/forward replays it. Reduced motion
+   users get a static accent only. */
+@keyframes diagram-new-pulse {
+  0% {
+    filter: drop-shadow(0 0 6px var(--accent));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+.diagram-element[data-diff-state="new"] {
+  animation: diagram-new-pulse 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram-element[data-diff-state="new"] {
+    animation: none;
+  }
+}
+
+/* Connections are unmounted per scene (not persistent in DOM). No enter/exit
+   animation — the scroll itself is the motion; arrows animating in on top of
+   it reads as visual noise. */
+
+.scrolly-steps {
+  display: flex;
+  flex-direction: column;
+}
+
+.scrolly-step {
+  /* Each step reserves a full viewport so the next scene's header doesn't
+     creep in while the current one is still on screen. Content stays
+     vertically centered — the extra slack is empty space above/below. */
+  min-height: 100vh;
+  padding: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.scrolly-step + .scrolly-step {
+  border-top: 1px solid var(--rule);
+}
+
+.scrolly-step h2 {
+  margin: 0 0 1rem;
+  transition: color 0.2s ease;
+}
+
+.scrolly-step[data-active="true"] h2 {
+  color: var(--accent);
+}
+
+/* ---- Prose (react-markdown output) ---- */
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose > :last-child {
+  margin-bottom: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.prose table {
+  margin: 0 0 1em;
+}
+
+.prose h3,
+.prose h4 {
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+
+.prose li {
+  margin: 0.2em 0;
+}
+
+.prose li > p {
+  margin: 0;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.1em 0 0.1em 1em;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2em 0;
+}
+
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+  font-size: 0.88em;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.15);
+  color: var(--accent);
+}
+
+.prose pre {
+  background: rgba(127, 127, 127, 0.12);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 1em;
+}
+
+/* ---- Syntax highlighting (highlight.js token classes) ----
+   Minimal custom theme that reuses the blog's existing palette. We pick
+   two hue families beyond --fg: accent (orange) for keywords/types, and
+   a soft teal for strings/numbers. Everything else inherits --fg. */
+:root {
+  --hl-string: #2a7a6b;
+  --hl-symbol: #b87900;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hl-string: #6fc8b8;
+    --hl-symbol: #f4c25c;
+  }
+}
+
+.hljs-keyword,
+.hljs-built_in,
+.hljs-section,
+.hljs-type,
+.hljs-class,
+.hljs-selector-tag,
+.hljs-meta {
+  color: var(--accent);
+}
+
+.hljs-string,
+.hljs-number,
+.hljs-literal,
+.hljs-regexp,
+.hljs-attr,
+.hljs-template-variable {
+  color: var(--hl-string);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-name {
+  color: var(--hl-symbol);
+}
+
+.hljs-params,
+.hljs-variable {
+  color: inherit;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--rule);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+
+.prose th {
+  background: rgba(127, 127, 127, 0.08);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+}
+
+@media (max-width: 900px) {
+  .scrolly-progressbar {
+    height: 20px;
+  }
+  .scrolly-progress-dots .label {
+    display: none;
+  }
+  .scrolly-progress-dots {
+    inset: 0 0.75rem;
+  }
+  .scrolly-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .scrolly-diagram {
+    height: 45vh;
+    top: 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+    z-index: 5;
+    grid-template-rows: 1fr; /* hide the extras row on mobile */
+    padding: 0;
+    gap: 0;
+  }
+  .extras-zone {
+    display: none; /* mobile sticky bar stays compact */
+  }
+  .extras-inline {
+    display: block; /* extras render inline under each scene instead */
+  }
+  .scrolly-step {
+    /* Mobile sticky diagram eats 45vh; leave 90vh per step so the
+       remaining 45vh prose window doesn't cram the next header in. */
+    min-height: 90vh;
+  }
+}
+
+/* ---- Intro meta (reading time) ---- */
+
+.intro .meta {
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Outro before/after comparison ---- */
+
+.outro h3 {
+  margin-top: 2.5rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.outro-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1rem 0 2rem;
+}
+
+.outro-comparison figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.outro-comparison figcaption {
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.outro-comparison figcaption code {
+  font-size: 0.85em;
+  background: rgba(127, 127, 127, 0.12);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+}
+
+.outro-comparison .diagram-svg {
+  width: 100%;
+  height: auto;
+  max-height: 240px;
+}
+
+@media (max-width: 720px) {
+  .outro-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Tools-and-resources footer ---- */
+
+footer.tools {
+  max-width: 640px;
+  margin: 4rem auto 0;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.95rem;
+}
+
+footer.tools h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+footer.tools ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.5rem;
+}
+
+footer.tools li {
+  line-height: 1.5;
+}
+
+footer.tools a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+footer.tools a:hover {
+  text-decoration: underline;
+}
+
+footer.tools code {
+  font-size: 0.85em;
+  background: rgba(127, 127, 127, 0.12);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+}
+
+@media (max-width: 720px) {
+  footer.tools ul {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* SVG <title> tooltips render natively on hover. Make the trigger area feel
+   tappable by hinting with a help cursor on diagram nodes/groups. */
+.diagram-node,
+.diagram-group {
+  cursor: help;
+}
