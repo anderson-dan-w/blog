@@ -1,6 +1,6 @@
 ---
-title: "Just Run a Migration"
-description: "One ALTER TABLE, ten layers of infrastructure: a scrollytelling walkthrough of every piece of plumbing that sits underneath adding a column at a real company."
+title: "From ALTER TABLE to automated DB rollout"
+description: "Anatomy of a modern database migration: one ALTER TABLE statement, ten layers of infrastructure (SQLAlchemy, Alembic, Docker, Kubernetes, Helm, GitHub Actions, ArgoCD, Terraform) sitting quietly underneath it. A scroll-driven walkthrough, layer by layer."
 pubDate: 2026-04-28
 tags: ["infrastructure", "kubernetes", "migrations", "alembic", "terraform"]
 customLayout: "scrolly"
