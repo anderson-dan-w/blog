@@ -24,7 +24,10 @@ jobs:
       - name: Build with Astro
         uses: withastro/action@v3
         with:
-          node-version: 22
+          # Node 24 (V8 12+) — needed for `highlight-hcl@1.0.0`'s regex,
+          # which uses ES2025 duplicate named capture groups (rejected by
+          # Node 22's older V8).
+          node-version: 24
 
   deploy:
     needs: build
