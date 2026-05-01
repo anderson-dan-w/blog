@@ -277,6 +277,15 @@ main {
   fill: var(--accent);
 }
 
+/* Connection-label halo. Painted as a thick bg-colored stroke behind the
+   fill text to visually cut the arrow shaft where it would cross the label.
+   Lives in CSS (not SVG attributes) because var() is reliable here. */
+.connection-label {
+  stroke: var(--bg);
+  stroke-width: 6;
+  paint-order: stroke;
+}
+
 /* Subtle one-shot glow on whatever's new this scene. The animation runs each
    time the rule starts matching (i.e. each time an element transitions into
    `new` state on scroll), so scrolling back/forward replays it. Reduced motion

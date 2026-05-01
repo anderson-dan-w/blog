@@ -76,8 +76,11 @@ export function Connection({ from, to, label, seed = 51 }: Props) {
       {label ? (
         // Bg-colored "halo" stroke painted first so the arrow shaft is
         // visually cut where it would otherwise run through the label.
-        // Works regardless of label length or arrow angle.
+        // The halo styles (stroke, stroke-width, paint-order) live in CSS:
+        // `var()` is unreliable inside SVG presentation attributes across
+        // browsers/build pipelines, but is solid inside CSS rules.
         <text
+          className="connection-label"
           x={labelX}
           y={labelY}
           textAnchor="middle"
@@ -85,9 +88,6 @@ export function Connection({ from, to, label, seed = 51 }: Props) {
           fontSize="10"
           opacity={0.9}
           fill="currentColor"
-          stroke="var(--bg)"
-          strokeWidth={6}
-          paintOrder="stroke"
         >
           {label}
         </text>
