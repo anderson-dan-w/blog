@@ -1,4 +1,4 @@
-import type { Scene } from "../content/posts/just-run-a-migration/scenes";
+import type { Scene } from "../content/posts/automated-db-migration/scenes";
 import { endpointId, type Edge, type GroupId, type NodeId } from "./layout";
 
 /**

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import scrollama from "scrollama";
-import type { Scene } from "../content/posts/just-run-a-migration/scenes";
+import type { Scene } from "../content/posts/automated-db-migration/scenes";
 import { diffScenes } from "../lib/diff";
 import { ArchitectureDiagram } from "./ArchitectureDiagram";
 import { Prose } from "./Prose";

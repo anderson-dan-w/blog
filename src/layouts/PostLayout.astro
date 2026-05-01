@@ -1,0 +1,59 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+type Props = {
+  title: string;
+  description: string;
+  pubDate: Date;
+  updatedDate?: Date;
+  tags?: string[];
+  image?: string;
+};
+
+const { title, description, pubDate, updatedDate, tags = [], image } =
+  Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// UTC formatting so frontmatter dates like `2026-04-28` (parsed as UTC
+// midnight) don't drift to the previous day for readers west of UTC.
+const fmt = (d: Date) =>
+  d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+---
+
+<BaseLayout title={title} description={description} image={image}>
+  <main class="post">
+    <p class="post-back">
+      <a href={`${base}/`}>&larr; all posts</a>
+    </p>
+    <article data-pagefind-body>
+      <header class="post-header">
+        <h1>{title}</h1>
+        <p class="post-meta">
+          <time datetime={pubDate.toISOString()}>{fmt(pubDate)}</time>
+          {updatedDate ? (
+            <>
+              <span class="post-meta-sep">·</span>
+              <span>updated <time datetime={updatedDate.toISOString()}>{fmt(updatedDate)}</time></span>
+            </>
+          ) : null}
+        </p>
+        {tags.length > 0 ? (
+          <ul class="post-tags">
+            {tags.map((t) => (
+              <li><a href={`${base}/tags/${t}/`}>#{t}</a></li>
+            ))}
+          </ul>
+        ) : null}
+      </header>
+      <div class="post-body">
+        <slot />
+      </div>
+    </article>
+  </main>
+</BaseLayout>
