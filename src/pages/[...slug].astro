@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from "astro:content";
+import PostLayout from "../layouts/PostLayout.astro";
+
+// Generate one route per plain-markdown post. Posts with a `customLayout`
+// frontmatter field have a hand-written `.astro` page sibling (e.g.
+// `pages/just-run-a-migration.astro`); skip them here.
+export async function getStaticPaths() {
+  const posts = await getCollection("blog", (entry) =>
+    entry.data.draft !== true && entry.data.customLayout === undefined,
+  );
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<PostLayout
+  title={post.data.title}
+  description={post.data.description}
+  pubDate={post.data.pubDate}
+  updatedDate={post.data.updatedDate}
+  tags={post.data.tags}
+>
+  <Content />
+</PostLayout>
