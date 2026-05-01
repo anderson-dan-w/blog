@@ -1,0 +1,126 @@
+---
+import { getEntry } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { Scrollytelling } from "../components/Scrollytelling";
+import { OutroComparison } from "../components/OutroComparison";
+import { scenes } from "../content/posts/just-run-a-migration/scenes";
+
+// Pulls title/description/etc from the content-collection stub so the
+// homepage card, RSS feed, and this page's <head> stay in sync.
+const entry = await getEntry("blog", "just-run-a-migration");
+if (!entry) throw new Error("blog/just-run-a-migration entry missing");
+
+// Reading-time estimate. Strip code fences (which inflate word count
+// disproportionately to actual reading), then count whitespace-delimited
+// tokens across all prose. 220 wpm is a typical read speed for technical
+// blog content.
+const allProse = scenes.map((s) => s.prose).join("\n");
+const wordsOnly = allProse.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
+const wordCount = wordsOnly.split(/\s+/).filter(Boolean).length;
+const readMinutes = Math.max(1, Math.round(wordCount / 220));
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout title={entry.data.title} description={entry.data.description}>
+	<main>
+		<p class="post-back">
+			<a href={`${base}/`}>&larr; all posts</a>
+		</p>
+
+		<section class="intro" data-pagefind-body>
+			<h1>From <code>ALTER TABLE</code> to automated DB rollout</h1>
+			<p class="subtitle">
+				anatomy of a modern database migration
+			</p>
+			<p class="meta">~{readMinutes} min read</p>
+			<p>
+				<code>ALTER TABLE widgets ADD COLUMN color;</code> - as simple as you can get.
+				In an automated pipeline though, that one statement passes through
+				SQLAlchemy, Alembic, Docker, Kubernetes, Helm, GitHub Actions,
+				ArgoCD, and Terraform before the new column actually exists in
+				prod.
+			</p>
+			<p>
+				None of that stack dropped from the sky. Each piece showed up to
+				solve a real problem the previous setup couldn&rsquo;t handle.
+				Here&rsquo;s the walkthrough, one layer at a time.
+			</p>
+			<p><em>Scroll to begin.</em></p>
+		</section>
+
+		<Scrollytelling client:load scenes={scenes} />
+
+		<section class="outro">
+			<h2>So, what&rsquo;s a migration, today?</h2>
+			<p>
+				For an engineer on the team, adding a column now looks like this:
+				<ul>
+				  <li>edit the SQLAlchemy model</li>
+				<li>run <code>alembic revision --autogenerate</code></li>
+				<li>open a PR</li>
+				<li>merge</li>
+			  </ul>
+				Four steps, all in Python and git.
+			</p>
+			<p>
+				Everything else in this post &mdash; the Dockerfiles, the
+				Kubernetes Jobs and Deployments, the Helm hooks, the GitHub
+				Actions checks, the ArgoCD Applications, the Terraform IAM
+				roles &mdash; sits quietly underneath those four steps so they
+				can stay that short.
+			</p>
+			<p>
+				It&rsquo;s a lot of machinery for adding a single column. It&rsquo;s
+				the right amount of machinery  when you need to be confident that
+				changes will show up where they need, when they&rsquo;re needed,
+				with testing and validation, without anyone having to remember anything.
+			</p>
+
+			<h3>Before and after</h3>
+			<OutroComparison />
+		</section>
+
+		<footer class="tools">
+			<h3>Tools mentioned</h3>
+			<ul>
+				<li>
+					<a href="https://www.sqlalchemy.org/" target="_blank" rel="noopener">SQLAlchemy</a> &mdash;
+					Python ORM and DDL generator.
+				</li>
+				<li>
+					<a href="https://alembic.sqlalchemy.org/" target="_blank" rel="noopener">Alembic</a> &mdash;
+					schema migrations on top of SQLAlchemy.
+				</li>
+				<li>
+					<a href="https://docs.docker.com/" target="_blank" rel="noopener">Docker</a> &mdash;
+					containerizes the app and the migration runner.
+				</li>
+				<li>
+					<a href="https://kubernetes.io/" target="_blank" rel="noopener">Kubernetes</a> &mdash;
+					orchestrates Deployments and Jobs.
+				</li>
+				<li>
+					<a href="https://helm.sh/" target="_blank" rel="noopener">Helm</a> &mdash;
+					templated, versioned k8s manifests.
+				</li>
+				<li>
+					<a href="https://docs.github.com/en/actions" target="_blank" rel="noopener">GitHub Actions</a> &mdash;
+					CI: builds images and runs <code>alembic check</code> on PRs.
+				</li>
+				<li>
+					<a href="https://argo-cd.readthedocs.io/" target="_blank" rel="noopener">ArgoCD</a> &mdash;
+					GitOps controller for k8s.
+				</li>
+				<li>
+					<a href="https://www.terraform.io/" target="_blank" rel="noopener">Terraform</a> &mdash;
+					infrastructure as code for AWS resources.
+				</li>
+				<li>
+					<a href="https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html" target="_blank" rel="noopener">IRSA</a> &mdash;
+					IAM roles for Kubernetes service accounts (AWS OIDC federation).
+				</li>
+			</ul>
+		</footer>
+	</main>
+</BaseLayout>
