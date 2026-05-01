@@ -1,0 +1,63 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const posts = (await getCollection("blog"))
+  .filter((p) => !p.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// Format in UTC so a date like `2026-04-28` (parsed as UTC midnight) doesn't
+// render as Apr 27 for readers west of UTC.
+const fmt = (d: Date) =>
+  d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+const SITE_TITLE = "dwa - blog";
+const SITE_DESCRIPTION =
+  "Notes on infrastructure, databases, kubernetes, and how the boring middle of software actually gets built.";
+---
+
+<BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
+  <main class="home">
+    <header class="home-header">
+      <h1>{SITE_TITLE}</h1>
+      <p>{SITE_DESCRIPTION}</p>
+    </header>
+
+    <h2 class="home-section-title">Posts</h2>
+    {posts.length === 0 ? (
+      <p>No posts yet.</p>
+    ) : (
+      <ul class="post-list">
+        {posts.map((post) => (
+          <li>
+            <article>
+              <h3 class="post-card-title">
+                <a href={`${base}/${post.id}/`}>{post.data.title}</a>
+              </h3>
+              <p class="post-card-meta">
+                <time datetime={post.data.pubDate.toISOString()}>
+                  {fmt(post.data.pubDate)}
+                </time>
+                {post.data.tags.length > 0 ? (
+                  <ul class="post-tags">
+                    {post.data.tags.map((t) => (
+                      <li><a href={`${base}/tags/${t}/`}>#{t}</a></li>
+                    ))}
+                  </ul>
+                ) : null}
+              </p>
+              <p class="post-card-description">{post.data.description}</p>
+            </article>
+          </li>
+        ))}
+      </ul>
+    )}
+  </main>
+</BaseLayout>

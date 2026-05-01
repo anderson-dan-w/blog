@@ -15,11 +15,14 @@ const { title, description, pubDate, updatedDate, tags = [], image } =
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// UTC formatting so frontmatter dates like `2026-04-28` (parsed as UTC
+// midnight) don't drift to the previous day for readers west of UTC.
 const fmt = (d: Date) =>
   d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 ---
 
