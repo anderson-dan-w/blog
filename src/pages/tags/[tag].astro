@@ -1,0 +1,68 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+export async function getStaticPaths() {
+  const posts = (await getCollection("blog")).filter((p) => !p.data.draft);
+  const tags = new Set<string>();
+  for (const p of posts) for (const t of p.data.tags) tags.add(t);
+
+  return [...tags].map((tag) => ({
+    params: { tag },
+    props: {
+      tag,
+      posts: posts
+        .filter((p) => p.data.tags.includes(tag))
+        .sort(
+          (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+        ),
+    },
+  }));
+}
+
+const { tag, posts } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const fmt = (d: Date) =>
+  d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+const title = `#${tag} - dwa - blog`;
+const description = `Posts tagged #${tag}.`;
+---
+
+<BaseLayout title={title} description={description}>
+  <main class="tags-page">
+    <p class="post-back"><a href={`${base}/tags/`}>&larr; all tags</a></p>
+    <h1>#{tag}</h1>
+    <p class="home-section-title">{posts.length} post{posts.length === 1 ? "" : "s"}</p>
+    <ul class="post-list">
+      {posts.map((post) => (
+        <li>
+          <article>
+            <h3 class="post-card-title">
+              <a href={`${base}/${post.id}/`}>{post.data.title}</a>
+            </h3>
+            <p class="post-card-meta">
+              <time datetime={post.data.pubDate.toISOString()}>
+                {fmt(post.data.pubDate)}
+              </time>
+              {post.data.tags.length > 0 ? (
+                <ul class="post-tags">
+                  {post.data.tags.map((t) => (
+                    <li><a href={`${base}/tags/${t}/`}>#{t}</a></li>
+                  ))}
+                </ul>
+              ) : null}
+            </p>
+            <p class="post-card-description">{post.data.description}</p>
+          </article>
+        </li>
+      ))}
+    </ul>
+  </main>
+</BaseLayout>
