@@ -1,0 +1,9 @@
+{
+  "_note": "stub — run scripts/fetch_contributions.py to populate with real data",
+  "generatedAt": "2026-05-18T00:00:00+00:00",
+  "accounts": [],
+  "startYear": 2026,
+  "endYear": 2026,
+  "totalContributions": 0,
+  "data": []
+}
