@@ -20,13 +20,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 GRAPHQL_URL = "https://api.github.com/graphql"
 
-QUERY = """
+CONTRIBUTIONS_QUERY = """
 query($login: String!, $from: DateTime!, $to: DateTime!) {
   user(login: $login) {
     contributionsCollection(from: $from, to: $to) {
@@ -44,14 +45,17 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
 }
 """
 
+USER_META_QUERY = """
+query($login: String!) {
+  user(login: $login) {
+    createdAt
+  }
+}
+"""
 
-def gql(token: str, login: str, from_: str, to: str) -> dict:
-    payload = json.dumps(
-        {
-            "query": QUERY,
-            "variables": {"login": login, "from": from_, "to": to},
-        }
-    ).encode("utf-8")
+
+def gql(token: str, query: str, variables: dict) -> dict:
+    payload = json.dumps({"query": query, "variables": variables}).encode("utf-8")
     req = urllib.request.Request(
         GRAPHQL_URL,
         data=payload,
@@ -65,18 +69,44 @@ def gql(token: str, login: str, from_: str, to: str) -> dict:
         return json.loads(resp.read())
 
 
+def fetch_user_created_year(login: str, token: str) -> int:
+    body = gql(token, USER_META_QUERY, {"login": login})
+    if "errors" in body:
+        raise RuntimeError(f"GraphQL error for {login}: {body['errors']}")
+    user = body["data"]["user"]
+    if user is None:
+        raise RuntimeError(f"user not found: {login}")
+    # createdAt is ISO 8601, e.g. "2014-03-12T18:00:00Z"
+    return int(user["createdAt"][:4])
+
+
 def fetch_user(login: str, token: str, start_year: int, end_year: int) -> dict[str, int]:
     """Return {YYYY-MM-DD: count} for one user across [start_year, end_year]."""
     out: dict[str, int] = {}
     for year in range(start_year, end_year + 1):
-        body = gql(
-            token,
-            login,
-            f"{year}-01-01T00:00:00Z",
-            f"{year}-12-31T23:59:59Z",
-        )
+        try:
+            body = gql(
+                token,
+                CONTRIBUTIONS_QUERY,
+                {
+                    "login": login,
+                    "from": f"{year}-01-01T00:00:00Z",
+                    "to": f"{year}-12-31T23:59:59Z",
+                },
+            )
+        except urllib.error.HTTPError as e:
+            print(f"  warn: {login} {year}: HTTP {e.code}, skipping", file=sys.stderr)
+            continue
         if "errors" in body:
-            raise RuntimeError(f"GraphQL error for {login} {year}: {body['errors']}")
+            # Most likely cause: `from` is before the user's createdAt. We
+            # already clamp to createdAt in main(), so this is a belt-and-
+            # suspenders fallback — log and keep going rather than abort the
+            # whole run over a single year.
+            print(
+                f"  warn: {login} {year}: {body['errors']}, skipping",
+                file=sys.stderr,
+            )
+            continue
         user = body["data"]["user"]
         if user is None:
             raise RuntimeError(f"user not found: {login}")
@@ -117,8 +147,16 @@ def main() -> int:
 
     merged: dict[str, int] = {}
     for u in users:
-        print(f"fetching {u} ({start_year}-{end_year})...", file=sys.stderr)
-        for date, n in fetch_user(u, token, start_year, end_year).items():
+        created_year = fetch_user_created_year(u, token)
+        effective_start = max(start_year, created_year)
+        if effective_start > start_year:
+            print(
+                f"fetching {u} ({effective_start}-{end_year}; account created {created_year})...",
+                file=sys.stderr,
+            )
+        else:
+            print(f"fetching {u} ({effective_start}-{end_year})...", file=sys.stderr)
+        for date, n in fetch_user(u, token, effective_start, end_year).items():
             merged[date] = merged.get(date, 0) + n
 
     data = [
