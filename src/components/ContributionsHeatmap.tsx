@@ -68,7 +68,11 @@ export default function ContributionsHeatmap({ src }: Props) {
             <a href={`https://github.com/${a}`}>@{a}</a>
           </span>
         ))}
-        . Last refreshed {fmt}.
+        . Last refreshed{" "}
+        <time className="date-pill" dateTime={data.generatedAt}>
+          {fmt}
+        </time>
+        .
       </p>
 
       <div className="heatmap-years">

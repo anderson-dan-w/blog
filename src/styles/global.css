@@ -756,6 +756,21 @@ footer.tools code {
   line-height: 1.55;
 }
 
+/* Subtle chip styling for `<time>` elements — gives dates a little visual
+   container without competing with tag pills (different shape: chip-radius
+   vs full pill) or stealing focus from titles. */
+.date-pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.1);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
 /* Inline tag pills used on cards + post headers + tag pages. */
 .tag-list,
 .post-tags {
@@ -823,10 +838,6 @@ footer.tools code {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-}
-
-.post-meta-sep {
-  opacity: 0.5;
 }
 
 /* Plain-markdown body styles. The scrollytelling post uses its own
