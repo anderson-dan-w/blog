@@ -687,6 +687,25 @@ footer.tools code {
   font-size: 1.05rem;
 }
 
+.site-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin: 0 0 2rem;
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.8rem;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
+}
+
 .home-section-title {
   font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
   font-size: 0.8rem;
@@ -735,6 +754,21 @@ footer.tools code {
   margin: 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+/* Subtle chip styling for `<time>` elements — gives dates a little visual
+   container without competing with tag pills (different shape: chip-radius
+   vs full pill) or stealing focus from titles. */
+.date-pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.1);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  line-height: 1.5;
 }
 
 /* Inline tag pills used on cards + post headers + tag pages. */
@@ -804,10 +838,6 @@ footer.tools code {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-}
-
-.post-meta-sep {
-  opacity: 0.5;
 }
 
 /* Plain-markdown body styles. The scrollytelling post uses its own
@@ -899,4 +929,172 @@ footer.tools code {
   font-size: 0.7rem;
   margin-left: 0.3rem;
   opacity: 0.7;
+}
+
+/* ---- Contributions heatmap (/contributions) ---- */
+
+:root {
+  --heatmap-0: rgba(127, 127, 127, 0.15);
+  --heatmap-1: #9be9a8;
+  --heatmap-2: #40c463;
+  --heatmap-3: #30a14e;
+  --heatmap-4: #216e39;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --heatmap-0: rgba(255, 255, 255, 0.07);
+    --heatmap-1: #0e4429;
+    --heatmap-2: #006d32;
+    --heatmap-3: #26a641;
+    --heatmap-4: #39d353;
+  }
+}
+
+.heatmap {
+  margin-top: 2rem;
+}
+
+.heatmap-status {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.heatmap-meta {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 1.5rem;
+}
+
+.heatmap-meta a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.heatmap-meta a:hover {
+  text-decoration: underline;
+}
+
+.heatmap-years {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.heatmap-year-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.heatmap-year-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.heatmap-year-header span {
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.heatmap-year-grid {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.heatmap-weekday-labels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 13px;
+}
+
+.heatmap-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.heatmap-cell {
+  fill: var(--heatmap-0);
+  stroke: rgba(27, 31, 35, 0.06);
+  stroke-width: 1;
+  transition: stroke 0.1s ease;
+}
+
+.heatmap-cell:hover {
+  stroke: var(--fg);
+  stroke-width: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .heatmap-cell {
+    stroke: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.heatmap-level-0 {
+  fill: var(--heatmap-0);
+}
+.heatmap-level-1 {
+  fill: var(--heatmap-1);
+}
+.heatmap-level-2 {
+  fill: var(--heatmap-2);
+}
+.heatmap-level-3 {
+  fill: var(--heatmap-3);
+}
+.heatmap-level-4 {
+  fill: var(--heatmap-4);
+}
+
+.heatmap-legend {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.heatmap-legend > span:first-child {
+  margin-right: 4px;
+}
+
+.heatmap-legend > span:last-child {
+  margin-left: 4px;
+}
+
+.heatmap-legend-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.heatmap-legend-cell.heatmap-level-0 {
+  background: var(--heatmap-0);
+}
+.heatmap-legend-cell.heatmap-level-1 {
+  background: var(--heatmap-1);
+}
+.heatmap-legend-cell.heatmap-level-2 {
+  background: var(--heatmap-2);
+}
+.heatmap-legend-cell.heatmap-level-3 {
+  background: var(--heatmap-3);
+}
+.heatmap-legend-cell.heatmap-level-4 {
+  background: var(--heatmap-4);
 }

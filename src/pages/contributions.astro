@@ -1,0 +1,35 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ContributionsHeatmap from "../components/ContributionsHeatmap.tsx";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const src = `${base}/contributions.json`;
+
+const SITE_TITLE = "dwa - contributions";
+const SITE_DESCRIPTION =
+  "GitHub contribution heatmap merged across multiple accounts.";
+---
+
+<BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
+  <main class="home">
+    <header class="home-header">
+      <p class="post-back">
+        <a href={`${base}/`}>&larr; back to posts</a>
+      </p>
+      <h1>contributions, merged</h1>
+      <p>
+        GitHub's profile heatmap only shows one account at a time. I've used a
+        handful across personal and company orgs over the years, so the green
+        squares on any one profile only tell a slice of the story. This page
+        glues them together — one merged timeline, ~a decade deep.
+      </p>
+      <p style="margin-top: 0.75rem; color: var(--muted); font-size: 0.9rem;">
+        Built from the public <code>contributionsCollection</code> GraphQL
+        endpoint. Source script lives at <code>scripts/fetch_contributions.py</code>
+        in this repo.
+      </p>
+    </header>
+
+    <ContributionsHeatmap client:load src={src} />
+  </main>
+</BaseLayout>
