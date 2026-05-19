@@ -20,27 +20,9 @@ type Props = {
   src: string;
 };
 
-const DATE_FMT: Intl.DateTimeFormatOptions = {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  weekday: "short",
-  timeZone: "UTC",
-};
-
-function formatDay(d: Day): string {
-  const date = new Date(`${d.date}T00:00:00Z`).toLocaleDateString(
-    "en-US",
-    DATE_FMT,
-  );
-  const noun = d.count === 1 ? "contribution" : "contributions";
-  return `${date} — ${d.count.toLocaleString()} ${noun}`;
-}
-
 export default function ContributionsHeatmap({ src }: Props) {
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<Day | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -89,18 +71,9 @@ export default function ContributionsHeatmap({ src }: Props) {
         . Last refreshed {fmt}.
       </p>
 
-      <div className="heatmap-hover" aria-live="polite">
-        {hovered ? formatDay(hovered) : "Hover a square for the day's total."}
-      </div>
-
       <div className="heatmap-years">
         {years.map((y) => (
-          <YearGrid
-            key={y}
-            year={y}
-            days={byYear.get(y)!}
-            onHover={setHovered}
-          />
+          <YearGrid key={y} year={y} days={byYear.get(y)!} />
         ))}
       </div>
 
@@ -109,13 +82,7 @@ export default function ContributionsHeatmap({ src }: Props) {
   );
 }
 
-type YearGridProps = {
-  year: number;
-  days: Day[];
-  onHover: (d: Day | null) => void;
-};
-
-function YearGrid({ year, days, onHover }: YearGridProps) {
+function YearGrid({ year, days }: { year: number; days: Day[] }) {
   // GitHub heatmap convention: columns are weeks (Sun..Sat). Pad the start so
   // Jan 1 lands on its correct weekday row.
   const offset = new Date(`${year}-01-01T00:00:00Z`).getUTCDay();
@@ -127,10 +94,7 @@ function YearGrid({ year, days, onHover }: YearGridProps) {
   const yearTotal = days.reduce((s, d) => s + d.count, 0);
 
   return (
-    <section
-      className="heatmap-year"
-      onMouseLeave={() => onHover(null)}
-    >
+    <section className="heatmap-year">
       <header className="heatmap-year-header">
         <h3>{year}</h3>
         <span>{yearTotal.toLocaleString()} contributions</span>
@@ -161,11 +125,11 @@ function YearGrid({ year, days, onHover }: YearGridProps) {
                 height={CELL}
                 rx={2}
                 className={`heatmap-cell heatmap-level-${d.level}`}
-                onMouseEnter={() => onHover(d)}
-                onFocus={() => onHover(d)}
-                tabIndex={0}
-                aria-label={formatDay(d)}
-              />
+              >
+                <title>
+                  {d.date}: {d.count} contribution{d.count === 1 ? "" : "s"}
+                </title>
+              </rect>
             );
           })}
         </svg>

@@ -25,12 +25,13 @@ const SITE_DESCRIPTION =
 
 <BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
   <main class="home">
+    <nav class="site-nav">
+      <a href={`${base}/contributions/`}>github activity</a>
+    </nav>
+
     <header class="home-header">
       <h1>{SITE_TITLE}</h1>
       <p>{SITE_DESCRIPTION}</p>
-      <p class="home-links">
-        <a href={`${base}/contributions/`}>contributions, merged across accounts &rarr;</a>
-      </p>
     </header>
 
     <h2 class="home-section-title">Posts</h2>

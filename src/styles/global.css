@@ -687,19 +687,23 @@ footer.tools code {
   font-size: 1.05rem;
 }
 
-.home-links {
-  margin-top: 0.75rem !important;
+.site-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin: 0 0 2rem;
   font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
-.home-links a {
-  color: var(--accent);
+.site-nav a {
+  color: var(--muted);
   text-decoration: none;
+  letter-spacing: 0.02em;
 }
 
-.home-links a:hover {
-  text-decoration: underline;
+.site-nav a:hover {
+  color: var(--accent);
 }
 
 .home-section-title {
@@ -1013,12 +1017,10 @@ footer.tools code {
   fill: var(--heatmap-0);
   stroke: rgba(27, 31, 35, 0.06);
   stroke-width: 1;
-  outline: none;
   transition: stroke 0.1s ease;
 }
 
-.heatmap-cell:hover,
-.heatmap-cell:focus-visible {
+.heatmap-cell:hover {
   stroke: var(--fg);
   stroke-width: 1.5;
 }
@@ -1027,17 +1029,6 @@ footer.tools code {
   .heatmap-cell {
     stroke: rgba(255, 255, 255, 0.04);
   }
-}
-
-.heatmap-hover {
-  margin: 0 0 1rem;
-  padding: 0.4rem 0.6rem;
-  background: rgba(127, 127, 127, 0.08);
-  border-radius: 4px;
-  font-family: ui-sans-serif, system-ui, -apple-system, Inter, sans-serif;
-  font-size: 0.85rem;
-  color: var(--muted);
-  min-height: 1.7em;
 }
 
 .heatmap-level-0 {
