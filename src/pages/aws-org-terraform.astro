@@ -1,0 +1,751 @@
+---
+import { getEntry } from "astro:content";
+import { AwsOrgScrolly } from "../components/AwsOrgScrolly";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const entry = await getEntry("blog", "aws-org-terraform");
+if (!entry) throw new Error("blog/aws-org-terraform entry missing");
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout title={entry.data.title} description={entry.data.description}>
+  <main>
+    <p class="post-back">
+      <a href={`${base}/`}>&larr; all posts</a>
+    </p>
+
+    <section class="intro" data-pagefind-body>
+      <h1>An AWS org bootstrap that doesn&rsquo;t trust itself</h1>
+      <p class="subtitle">
+        Principle of Least Privilege applied to AWS Organizations and infrastructure-as-code.
+      </p>
+
+      <p>
+        Most &ldquo;set up an AWS org in Terraform&rdquo; posts end with
+        <code>terraform apply</code> from a single profile that has admin
+        everywhere. That works until it doesn&rsquo;t: some copy-pasta sneaks in
+        or someone runs an apply with the wrong AWS profile active and now
+        your IaC state-storage account silently grows an EKS cluster or an RDS instance.
+      </p>
+
+      <p>
+        Even when a small team starts out, it&rsquo;s worth setting up a new AWS org with
+        clear boundaries and least privilege to avoid surprises later.
+        Retrofitting isolation  and least privilege can be a nightmare but if you start clean,
+        each piece feels simple and easy on its own.
+      </p>
+
+      <p><em>Scroll to begin.</em></p>
+    </section>
+
+    <AwsOrgScrolly client:load />
+
+    <section class="body">
+      <h2>The pattern, in one diagram</h2>
+      <p>
+        Three AWS accounts, each with one job:
+      </p>
+      <table>
+        <thead>
+          <tr><th>Account</th><th>AWS profile</th><th>Job</th><th>Used by</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Management</strong></td>
+            <td><code>org</code></td>
+            <td>The Org itself, OUs, IAM Identity Center, permission sets, group assignments.</td>
+            <td><code>terraform/aws/org/main.tf</code> only.</td>
+          </tr>
+          <tr>
+            <td><strong>terraform</strong></td>
+            <td><code>terraform</code></td>
+            <td>Hosts the state bucket and the lock. Nothing else.</td>
+            <td>Every workspace&rsquo;s <code>backend.tf</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>app-dev / app-prod / sandbox-*</strong></td>
+            <td><code>app-dev</code> / <code>app-prod</code> / etc.</td>
+            <td>Real workloads &mdash; EKS, RDS, IAM roles, the actual product.</td>
+            <td>Each workspace&rsquo;s <code>main.tf</code> provider block.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Two profiles per workspace. The <code>terraform</code> profile is
+        narrow: read state, write state, acquire the lock. Nothing else.
+        The workload profile is broad <em>within its target account</em>
+        and powerless everywhere else. They never overlap on a single
+        credential.
+      </p>
+
+      <h2>The chicken-and-egg list</h2>
+      <p>
+        A useful exercise: write down the things Terraform <em>cannot</em>
+        do, before writing down anything Terraform <em>will</em> do.
+        There are exactly four:
+      </p>
+      <ol>
+        <li>Sign up for the first AWS account (browser, credit card, email).</li>
+        <li>
+          Enable MFA on the root user, store the recovery codes somewhere
+          you&rsquo;ll find again, and lock the root user away.
+        </li>
+        <li>
+          Enable IAM Identity Center in the management account
+          (one click, one time).
+        </li>
+        <li>
+          Create the very first SSO user + an <code>AdministratorAccess</code>
+          permission set so you have a non-root identity to log in as.
+        </li>
+      </ol>
+      <p>
+        After (4), the AWS CLI can do <code>aws sso login</code>, Terraform
+        can read those credentials, and from then on every change is HCL
+        and a pull request.
+      </p>
+
+      <h2>Narrowing the org-runner credential</h2>
+      <p>
+        The credential we just bootstrapped &mdash; an SSO user assigned
+        to <code>AdministratorAccess</code> on the management account &mdash;
+        is broader than we want it to be for daily org operations. It can
+        do anything in management: create EKS clusters, RDS instances,
+        IAM users, anything. We don&rsquo;t want anything in management
+        except the org tree, Identity Center, and account assignments. So
+        the very first <code>terraform apply</code> run by the bootstrap
+        admin defines a <em>narrower</em> permission set called
+        <code>OrgManagement</code>, then assigns the (small) org-mgmt group
+        to it on the management account.
+      </p>
+      <p>
+        The word &ldquo;narrow&rdquo; needs unpacking, because Identity
+        Center has four moving parts and only one of them is changing:
+      </p>
+      <ul>
+        <li>
+          A <strong>user</strong> (you, with email + MFA) lives in the
+          identity store.
+        </li>
+        <li>
+          <strong>Groups</strong> (<code>org-mgmt</code>,
+          <code>break-glass</code>, &hellip;) bag users together.
+        </li>
+        <li>
+          <strong>Permission sets</strong> (<code>AdministratorAccess</code>,
+          <code>OrgManagement</code>) are reusable IAM-policy blobs.
+        </li>
+        <li>
+          An <strong>account assignment</strong> is the actual grant: a
+          3-tuple of <em>(principal, permission set, target account)</em>.
+        </li>
+      </ul>
+      <p>
+        Narrowing the bootstrap admin doesn&rsquo;t delete or rebuild the
+        user, and doesn&rsquo;t throw away the <code>AdministratorAccess</code>
+        permset. It only edits the <em>account-assignments</em> table:
+        a new row for <code>OrgManagement</code> on the management account,
+        and (eventually) the removal of the row that grants
+        <code>AdministratorAccess</code> on management to your everyday
+        identity. Same human, same SSO login flow, less power.
+      </p>
+      <p>
+        This is the same pattern we&rsquo;ll apply to state access in a
+        moment, just on the other surface. Replace a broad credential with
+        a narrow one as soon as you have something to narrow it with.
+      </p>
+      <pre><code>{`# org/permsets.tf
+resource "aws_ssoadmin_permission_set" "org_management" {
+  name         = "OrgManagement"
+  instance_arn = local.sso_instance_arn
+}
+
+resource "aws_ssoadmin_managed_policy_attachment" "org_organizations" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.org_management.arn
+  managed_policy_arn = "arn:aws:iam::aws:policy/AWSOrganizationsFullAccess"
+}
+
+resource "aws_ssoadmin_managed_policy_attachment" "org_sso" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.org_management.arn
+  managed_policy_arn = "arn:aws:iam::aws:policy/AWSSSOMasterAccountAdministrator"
+}
+
+resource "aws_ssoadmin_permission_set_inline_policy" "org_extras" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.org_management.arn
+  inline_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = ["identitystore:*", "iam:CreateServiceLinkedRole"],
+      Resource = "*",
+    }],
+  })
+}`}</code></pre>
+      <p>
+        Three policies stitched together: <code>AWSOrganizationsFullAccess</code>
+        (the org tree, OUs, accounts, SCPs), <code>AWSSSOMasterAccountAdministrator</code>
+        (Identity Center config, permission sets, account assignments),
+        and a small inline policy for the identity-store API and the
+        service-linked role Identity Center needs the first time you
+        assign a permission set. Together they cover everything
+        <code>terraform/aws/org/</code> needs to manage. <code>IAMFullAccess</code>
+        was overshooting; we don&rsquo;t need to create arbitrary IAM users
+        or roles in the management account.
+      </p>
+      <p>
+        With the new permset created, the actual flip is just an
+        <code>aws_ssoadmin_account_assignment</code>: principal =
+        <code>org-mgmt</code> group, permission_set =
+        <code>OrgManagement</code>, target = management account. Add
+        yourself to the group, log out, log back in selecting
+        <code>OrgManagement</code> instead of <code>AdministratorAccess</code>
+        in the role picker. The <code>AdministratorAccess</code> permset
+        still exists; we just stop assigning your everyday identity to
+        it on management. We keep one tiny <code>break-glass</code> group
+        with that assignment for emergencies. Everyone else&rsquo;s daily
+        account-assignment list on management shrinks to
+        <code>OrgManagement</code> only.
+      </p>
+      <p>
+        Net effect: a typo that drops a <code>{`resource "aws_eks_cluster" "oops"`}</code>
+        into <code>terraform/aws/org/main.tf</code> fails the apply at IAM
+        instead of creating an EKS cluster in the management account. The
+        mistake is contained at the credential, not at the &ldquo;carefully
+        reviewed PR&rdquo; layer.
+      </p>
+      <p>
+        One footnote on the chronology: this very first apply runs with
+        <em>local</em> state on your laptop, because we don&rsquo;t have an
+        S3 backend yet &mdash; the <code>terraform</code> account that holds
+        it is the next step. The local <code>terraform.tfstate</code> file
+        sticks around for one or two more applies, then gets migrated to
+        S3 with <code>terraform init -migrate-state</code>. After that, no
+        <code>.tfstate</code> ever sits on a laptop again.
+      </p>
+
+      <h2>The dedicated <code>terraform</code> account</h2>
+      <p>
+        This is the unusual part of the setup, so it&rsquo;s worth making
+        the case for it.
+      </p>
+      <p>
+        Most posts on this topic put the state bucket either (a) in the
+        management account, or (b) in the workload account being managed
+        (one bucket per environment). Both are reasonable. The trade-offs:
+      </p>
+      <ul>
+        <li>
+          <strong>State in management:</strong> centralized, easy to back
+          up, easy to grant access to. But the management account is also
+          where you keep the org tree, SSO, billing &mdash; very high-value,
+          frequently-touched. Mixing the &ldquo;keep this safe&rdquo; account
+          with the &ldquo;everyone&rsquo;s state lives here&rdquo; account
+          fights the principle that you don&rsquo;t want lots of identities
+          getting tokens for the management account.
+        </li>
+        <li>
+          <strong>State per workload account:</strong> blast-radius nice for
+          the workload itself &mdash; if you nuke <code>app-dev</code>,
+          you nuke its state along with it, and that&rsquo;s arguably fine.
+          But cross-environment terraform (e.g. an org-wide module that
+          touches three accounts at once) becomes awkward, and you end up
+          juggling N state backends.
+        </li>
+        <li>
+          <strong>State in a dedicated account:</strong> centralized like
+          option (a), but isolated from the org/SSO/billing surface area.
+          Every workspace points at the same bucket; the access policy is
+          one IAM resource; the audit trail is one CloudTrail. Costs you
+          one extra AWS account (free) and one provisioning step.
+        </li>
+      </ul>
+      <p>
+        The dedicated-account option is the one we picked. The whole pattern
+        falls out of one IAM policy.
+      </p>
+
+      <h3>The fifteen-line policy that makes it work</h3>
+      <p>
+        Inside the <code>terraform</code> account, we define exactly one
+        custom IAM policy:
+      </p>
+      <pre><code>{`# terraform/aws/terraform/main.tf — the policy that locks the box
+
+resource "aws_iam_policy" "terraform_state_access" {
+  name        = "TerraformStateAccess"
+  description = "Read/write Terraform state. Nothing else."
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "s3:ListBucket",
+        Resource = aws_s3_bucket.terraform_state.arn,
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+        Resource = "\${aws_s3_bucket.terraform_state.arn}/*",
+      },
+    ],
+  })
+}`}</code></pre>
+      <p>
+        Four S3 actions, one bucket. Anyone with this policy can read, write,
+        and lock state &mdash; and nothing else, anywhere in the
+        <code>terraform</code> account. If a misconfigured Terraform module
+        ever tries to <code>{`resource "aws_s3_bucket" "oops" { provider = aws.terraform_account }`}</code>,
+        the API call fails at the IAM layer. The mistake is contained at
+        the credential, not at the &ldquo;carefully reviewed PR&rdquo;
+        layer.
+      </p>
+      <p>
+        We expose the policy as an Identity Center permission set called
+        <code>TerraformStateAccess</code>, and assign it to the engineering
+        group on the <code>terraform</code> account &mdash; and only the
+        <code>terraform</code> account.
+      </p>
+      <pre><code>{`resource "aws_ssoadmin_permission_set" "terraform_state_access" {
+  name         = "TerraformStateAccess"
+  instance_arn = local.sso_instance_arn
+}
+
+resource "aws_ssoadmin_customer_managed_policy_attachment" "terraform_state_access" {
+  instance_arn       = aws_ssoadmin_permission_set.terraform_state_access.instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.terraform_state_access.arn
+  customer_managed_policy_reference {
+    name = "TerraformStateAccess"
+    path = "/"
+  }
+}
+
+resource "aws_ssoadmin_account_assignment" "terraform_engineering_state_access" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.terraform_state_access.arn
+
+  principal_id   = aws_identitystore_group.groups["engineering"].group_id
+  principal_type = "GROUP"
+
+  target_id   = aws_organizations_account.terraform.id
+  target_type = "AWS_ACCOUNT"
+}`}</code></pre>
+
+      <h2>Aside: Terraform 1.11 killed the DynamoDB lock table</h2>
+      <p>
+        For most of Terraform&rsquo;s life, the canonical S3 backend
+        recipe was &ldquo;S3 bucket for state, DynamoDB table for locking,
+        coordinate them via <code>dynamodb_table</code> in the backend
+        block.&rdquo; That&rsquo;s two AWS resources, two IAM policies, and
+        a non-trivial bit of mental model.
+      </p>
+      <p>
+        Terraform 1.11 (released Feb 2025) added native S3 lockfile support.
+        The lock now lives as a small <code>.tflock</code> object next to
+        the state file; the same four S3 actions cover it. The DynamoDB
+        table is no longer required and the <code>dynamodb_table</code>
+        argument is deprecated.
+      </p>
+      <pre><code>{`# the modern shape (TF >= 1.11)
+terraform {
+  backend "s3" {
+    bucket       = "dbnl-tfstate"
+    key          = "app-dev"
+    profile      = "terraform"
+    region       = "us-east-1"
+    use_lockfile = true        # was: dynamodb_table = "tfstate_lock"
+    encrypt      = true
+  }
+}`}</code></pre>
+      <p>
+        For our pattern, this also means the <em>second</em> custom IAM
+        policy (<code>TerraformStateLockAccess</code>, four DynamoDB
+        actions on one table) becomes redundant. Drop it. The
+        <code>TerraformStateAccess</code> S3 policy alone now covers
+        both state and lock.
+      </p>
+      <p>
+        If you&rsquo;re migrating an existing setup, you can leave the
+        DynamoDB table in place during the transition &mdash; Terraform
+        accepts both <code>use_lockfile</code> and <code>dynamodb_table</code>
+        simultaneously while you wait for every workspace to re-init.
+      </p>
+
+      <h2>The dual-profile split inside every workspace</h2>
+      <p>
+        With the <code>terraform</code> account and its narrow permission
+        set in place, every workspace under <code>terraform/aws/</code>
+        gets the same shape: two files, two profiles.
+      </p>
+      <p>
+        <code>backend.tf</code> uses the <code>terraform</code> profile.
+        Its job is to read and write the state file. It cannot do anything
+        else:
+      </p>
+      <pre><code>{`# terraform/aws/app/dev/backend.tf
+terraform {
+  backend "s3" {
+    bucket       = "dbnl-tfstate"
+    key          = "app-dev"
+    profile      = "terraform"   # TerraformStateAccess only
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
+  }
+}`}</code></pre>
+      <p>
+        <code>main.tf</code> uses the workload profile &mdash;
+        <code>app-dev</code>, <code>app-prod</code>, <code>sandbox-dan</code>,
+        whatever the workspace is for. Its job is to provision real
+        resources. It cannot touch state:
+      </p>
+      <pre><code>{`# terraform/aws/app/dev/main.tf
+provider "aws" {
+  profile = "app-dev"   # admin in app-dev only
+  region  = "us-east-1"
+}
+
+# ... resources ...`}</code></pre>
+      <p>
+        The two profiles intentionally do not share a single permission.
+        There is no terraform run that has both &ldquo;create EKS
+        clusters&rdquo; and &ldquo;modify state&rdquo; on the same
+        credential. Two profiles, two failure modes, no
+        cross-contamination.
+      </p>
+
+      <h3>What this looks like in <code>~/.aws/config</code></h3>
+      <p>
+        After <code>aws configure sso</code> on a fresh laptop, you end
+        up with three profiles backed by the Identity Center session:
+      </p>
+      <pre><code>{`[sso-session sso]
+sso_start_url  = https://distributional.awsapps.com/start
+sso_region     = us-east-1
+sso_registration_scopes = sso:account:access
+
+[profile terraform]
+sso_session    = sso
+sso_account_id = 111111111111   # the terraform account
+sso_role_name  = TerraformStateAccess
+region         = us-east-1
+
+[profile app-dev]
+sso_session    = sso
+sso_account_id = 222222222222   # the app-dev account
+sso_role_name  = AdministratorAccess
+region         = us-east-1
+
+[profile org]
+sso_session    = sso
+sso_account_id = 333333333333   # the management account
+sso_role_name  = AdministratorAccess
+region         = us-east-1`}</code></pre>
+      <p>
+        One <code>aws sso login --sso-session sso</code> hydrates all
+        three. <code>terraform init</code> picks up the
+        <code>terraform</code> profile from the backend block;
+        <code>terraform plan</code> picks up the workload profile from
+        the provider block. The same human can do both, but each invocation
+        only ever has the credentials it needs for the thing it&rsquo;s
+        about to do.
+      </p>
+
+      <h2>The <code>org/</code> module: where the rest of the org lives</h2>
+      <p>
+        With the trust pattern established, the rest is mostly plumbing.
+        The <code>org/</code> Terraform workspace, which uses the
+        <code>org</code> profile (admin in management), defines:
+      </p>
+      <ul>
+        <li>The <code>aws_organizations_organization</code> resource itself.</li>
+        <li>OUs (<code>app</code>, <code>sandbox</code>, <code>monitoring</code>, &hellip;).</li>
+        <li>Member accounts under each OU.</li>
+        <li>Identity Center users and groups.</li>
+        <li>Permission sets (<code>AdministratorAccess</code>, <code>DevAccess</code>, <code>ReadOnlyAccess</code>, <code>TerraformStateAccess</code>, &hellip;).</li>
+        <li>Account assignments &mdash; the join that says &ldquo;this group gets this permission set on this account.&rdquo;</li>
+      </ul>
+      <p>
+        Pieces of it, abridged:
+      </p>
+      <pre><code>{`resource "aws_organizations_organization" "org" {
+  feature_set                   = "ALL"
+  enabled_policy_types          = ["SERVICE_CONTROL_POLICY"]
+  aws_service_access_principals = ["sso.amazonaws.com"]
+}
+
+# OUs
+resource "aws_organizations_organizational_unit" "app" {
+  name      = "app"
+  parent_id = aws_organizations_organization.org.roots[0].id
+}
+
+# Accounts. The lifecycle.ignore_changes is non-negotiable — without it,
+# drift in any of these fields would force destroy/recreate, which closes
+# the account.
+resource "aws_organizations_account" "app_dev" {
+  name      = "app-dev"
+  email     = "aws+app-dev@acme.dev"
+  parent_id = aws_organizations_organizational_unit.app.id
+  role_name = "OrganizationAccountAccessRole"
+
+  lifecycle { ignore_changes = [name, email, role_name] }
+}
+
+# SSO group + admin assignment on the workload account
+resource "aws_identitystore_group" "engineering" {
+  identity_store_id = local.identity_store_id
+  display_name      = "Engineering"
+}
+
+resource "aws_ssoadmin_account_assignment" "app_dev_engineering_admin" {
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = aws_ssoadmin_permission_set.admin.arn
+  principal_id       = aws_identitystore_group.engineering.group_id
+  principal_type     = "GROUP"
+  target_id          = aws_organizations_account.app_dev.id
+  target_type        = "AWS_ACCOUNT"
+}`}</code></pre>
+      <p>
+        If you already created the org by hand &mdash; and almost everyone
+        does, since you needed it to enable Identity Center &mdash; the
+        modern declarative <code>import {}</code> block (TF 1.5+) brings
+        it under management without surprise:
+      </p>
+      <pre><code>{`import {
+  to = aws_organizations_organization.org
+  id = "o-XXXXXXXX"
+}
+
+import {
+  to = aws_organizations_account.management
+  id = "111111111111"
+}`}</code></pre>
+
+      <h2>What we&rsquo;d add: SCPs</h2>
+      <p>
+        Service Control Policies are deny-fences attached to OUs. They
+        cap what any IAM identity in that subtree can do, regardless of
+        how permissive the IAM policy attached to that identity is.
+      </p>
+      <p>
+        Honesty: our org doesn&rsquo;t have any SCPs attached yet. The
+        org resource has <code>enabled_policy_types = ["SERVICE_CONTROL_POLICY"]</code>
+        so the capability is on, but no actual policies are bound. That&rsquo;s
+        a gap, and one of the next things on the list. The starter set
+        most teams want:
+      </p>
+      <ul>
+        <li><strong>deny-leave-organization:</strong> nobody, not even a workload-account admin, can detach.</li>
+        <li><strong>deny-disable-cloudtrail:</strong> the audit trail is non-negotiable.</li>
+        <li><strong>deny-region-allowlist:</strong> refuse anything outside the regions you actually deploy to. Stops accidental Mumbai sprawl.</li>
+        <li><strong>deny-root-user-actions:</strong> deny <em>every</em> action where the principal is the root user. Forces SSO.</li>
+      </ul>
+      <pre><code>{`# Region allowlist — refuse any non-allowlisted region for non-global services.
+data "aws_iam_policy_document" "region_allowlist" {
+  statement {
+    effect = "Deny"
+    not_actions = [
+      "iam:*", "organizations:*", "sts:*",
+      "cloudfront:*", "route53:*", "support:*",  # global services
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:RequestedRegion"
+      values   = ["us-east-1", "us-west-2"]
+    }
+  }
+}
+
+resource "aws_organizations_policy" "region_allowlist" {
+  name    = "region-allowlist"
+  type    = "SERVICE_CONTROL_POLICY"
+  content = data.aws_iam_policy_document.region_allowlist.json
+}
+
+resource "aws_organizations_policy_attachment" "region_allowlist_app" {
+  policy_id = aws_organizations_policy.region_allowlist.id
+  target_id = aws_organizations_organizational_unit.app.id
+}`}</code></pre>
+      <p>
+        Test SCPs in a sandbox OU first. They take effect <em>immediately</em>
+        on attach, and a too-broad deny can lock you out of an account
+        cleanly &mdash; you&rsquo;ll need to detach from the management
+        account to recover. The management account itself is exempt from
+        custom SCPs by default.
+      </p>
+
+      <h2>What I&rsquo;d skip on a first pass</h2>
+      <ul>
+        <li>
+          <strong>Control Tower.</strong> If you&rsquo;re a small team
+          starting from scratch and want to <em>understand</em> what&rsquo;s
+          happening, skip Control Tower for now. It paves over a lot of
+          useful learning and adds an opinionated baseline that&rsquo;s
+          painful to opt out of later. Reach for it (or AFT) once you have
+          opinions about what you actually want.
+        </li>
+        <li>
+          <strong>An external IdP (Okta, Google Workspace, Entra).</strong>
+          Identity Center&rsquo;s built-in directory is fine for the first
+          few months. Switching to an external IdP later is a configuration
+          change in one place, not a rewrite.
+        </li>
+        <li>
+          <strong>A Terraform IAM user with long-lived keys.</strong>
+          Don&rsquo;t. Use <code>aws sso login</code> and short-lived
+          credentials from day one. Your future self will thank you the
+          first time something gets leaked.
+        </li>
+      </ul>
+
+      <h2>Footguns I&rsquo;ve hit</h2>
+      <ul>
+        <li>
+          <strong>Account email reuse.</strong> AWS rejects creation
+          even if the previous account was closed two years ago. Use
+          plus-addressing on a domain you control.
+        </li>
+        <li>
+          <strong>Account closure via Terraform.</strong> There is no
+          clean <code>terraform destroy</code> for an account. The
+          <code>aws_organizations_account</code> resource can &ldquo;remove&rdquo;
+          it from the org, but the account itself lingers. Closing it is
+          a manual root-user action with a 90-day grace period.
+        </li>
+        <li>
+          <strong>Forgetting <code>lifecycle.ignore_changes</code>.</strong>
+          AWS rejects in-place updates to <code>name</code>, <code>email</code>,
+          and <code>role_name</code> on member accounts. Without the lifecycle
+          rule, drift on those fields shows as a destroy/recreate plan, which
+          is terrifying &mdash; recreate means closing the account.
+        </li>
+        <li>
+          <strong>Moving an account between OUs.</strong> Works, but
+          double-check the plan &mdash; you want an in-place update of
+          <code>parent_id</code>, not a destroy/recreate.
+        </li>
+        <li>
+          <strong>SSO assignment is rate-limited.</strong> The
+          <code>aws_ssoadmin_account_assignment</code> resource is slow.
+          On a big team with many accounts, expect <code>terraform apply</code>
+          in <code>org/</code> to take 5&ndash;15 minutes.
+        </li>
+      </ul>
+    </section>
+
+    <section class="outro">
+      <h2>What this gets you</h2>
+      <p>
+        Your Git history is the audit log for the entire organization
+        structure. Every new account is a PR. Every SCP change is a PR.
+        Adding a new engineer is a PR that adds them to a group; their
+        access in every account changes the next time they re-run
+        <code>aws sso login</code>.
+      </p>
+      <p>
+        And, more importantly: the day someone runs the wrong
+        <code>terraform apply</code> from the wrong directory, the
+        explosion is bounded. The credential they were using either had
+        permission to write state but not to create resources, or had
+        permission to create resources in <em>one</em> account but not
+        anywhere else. The org is paranoid on the user&rsquo;s behalf.
+      </p>
+    </section>
+
+    <footer class="tools">
+      <h3>Other posts on this</h3>
+      <p>
+        I&rsquo;m not the first person to write about bootstrapping an
+        AWS org in Terraform. A few I learned from while putting this
+        together; their angles complement (rather than duplicate)
+        what&rsquo;s above:
+      </p>
+      <ul>
+        <li>
+          <a href="https://sophiabits.com/blog/managing-your-aws-organization-in-terraform" target="_blank" rel="noopener">
+            Sophia Willows &mdash; Managing your AWS organization in Terraform
+          </a>
+          (2023). The cleanest treatment of the &ldquo;wrap account
+          creation in a module, instantiate one provider per account&rdquo;
+          pattern for cross-account terraform. Doesn&rsquo;t cover the
+          dedicated state-account pattern; uses <code>AssumeRole</code> in
+          providers rather than separate Identity Center permission sets.
+          Read this if you want a different take on how the post-bootstrap
+          terraform itself is shaped.
+        </li>
+        <li>
+          <a href="https://www.adyxax.org/blog/2025/07/01/aws-identity-center-with-opentofu/terraform/" target="_blank" rel="noopener">
+            adyxax &mdash; AWS Identity Center with OpenTofu/Terraform
+          </a>
+          (2025). Goes deeper on the Identity Center side: external IdP
+          integration, SCIM provisioning, and OpenTofu-specific bits.
+        </li>
+        <li>
+          <a href="https://docs.cloudposse.com/layers/accounts/prepare-aws-organization/" target="_blank" rel="noopener">
+            Cloud Posse &mdash; Preparing Your AWS Organization
+          </a>.
+          Reference architecture for &ldquo;real&rdquo; teams. Heavy on
+          opinions, heavy on conventions, heavy on modules. Worth reading
+          even if you don&rsquo;t adopt their stack &mdash; the layering of
+          identity, logging, and shared-services accounts is well thought
+          out and broadly aligned with the dedicated-state-account idea
+          here.
+        </li>
+        <li>
+          <a href="https://developer.hashicorp.com/terraform/tutorials/aws/aws-control-tower-aft" target="_blank" rel="noopener">
+            HashiCorp &mdash; Control Tower Account Factory for Terraform (AFT)
+          </a>.
+          The official path if you want Control Tower&rsquo;s opinions baked
+          in. Useful as a reference for what a much larger org might
+          eventually want; the &ldquo;skip on first pass&rdquo; advice
+          above is the contrarian take on it.
+        </li>
+        <li>
+          <a href="https://aws.amazon.com/blogs/mt/managing-the-multi-account-environment-using-aws-organizations-and-aws-control-tower/" target="_blank" rel="noopener">
+            AWS Cloud Operations Blog &mdash; Managing multi-account environments
+          </a>.
+          AWS&rsquo;s own framing of Organizations vs. Control Tower. Good
+          for the conceptual map even if you skip the Control Tower pitch.
+        </li>
+        <li>
+          <a href="https://developer.hashicorp.com/terraform/language/backend/s3" target="_blank" rel="noopener">
+            HashiCorp &mdash; S3 backend documentation
+          </a>.
+          The canonical reference on <code>use_lockfile</code> and the
+          DynamoDB deprecation.
+        </li>
+      </ul>
+
+      <h3>Tools mentioned</h3>
+      <ul>
+        <li>
+          <a href="https://docs.aws.amazon.com/organizations/" target="_blank" rel="noopener">AWS Organizations</a>
+          &mdash; the multi-account substrate. Always free.
+        </li>
+        <li>
+          <a href="https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html" target="_blank" rel="noopener">IAM Identity Center</a>
+          &mdash; AWS&rsquo;s SSO product. Free with the built-in directory.
+        </li>
+        <li>
+          <a href="https://www.terraform.io/" target="_blank" rel="noopener">Terraform</a>
+          (or <a href="https://opentofu.org/" target="_blank" rel="noopener">OpenTofu</a>);
+          everything in this post works on either. The
+          <code>use_lockfile</code> S3 backend feature requires Terraform
+          1.11+ or a recent OpenTofu release.
+        </li>
+        <li>
+          <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs" target="_blank" rel="noopener">hashicorp/aws provider</a>
+          &mdash; specifically the <code>aws_organizations_*</code>,
+          <code>aws_ssoadmin_*</code>, and <code>aws_identitystore_*</code>
+          resource families.
+        </li>
+      </ul>
+    </footer>
+  </main>
+</BaseLayout>

@@ -262,6 +262,11 @@ main {
   transition: opacity 0.4s ease;
 }
 
+/* Element hasn't been introduced yet at this scrolly step. */
+.diagram-element[data-diff-state="hidden"] {
+  opacity: 0;
+}
+
 .diagram-element[data-diff-state="unchanged"] {
   opacity: 0.5;
 }
